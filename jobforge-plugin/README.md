@@ -1,4 +1,4 @@
-# JobForge — AI Career Agent Plugin
+﻿# JobForge â€” AI Career Agent Plugin
 
 > AI-powered resume analysis, job search, ATS optimization, tailored cover letters, and form auto-fill with approval.
 
@@ -6,7 +6,7 @@
 
 ## What This Is
 
-JobForge is a Claude Code plugin (and Antigravity-compatible skill set) that turns your raw resume into high-quality, tailored job applications — with you in control at every step.
+JobForge is a Claude Code plugin (and Antigravity-compatible skill set) that turns your raw resume into high-quality, tailored job applications â€” with you in control at every step.
 
 It mirrors the structure of the [Proficiently](https://proficiently.com) skill set, rebuilt from scratch as an open, extensible plugin.
 
@@ -16,8 +16,8 @@ It mirrors the structure of the [Proficiently](https://proficiently.com) skill s
 
 | Command | What It Does |
 |---------|-------------|
-| `/jobforge:setup` | One-time onboarding — resume, preferences, work history interview |
-| `/jobforge:ats-score` | Score your resume (0–100) with detailed breakdown and fixes |
+| `/jobforge:setup` | One-time onboarding â€” resume, preferences, work history interview |
+| `/jobforge:ats-score` | Score your resume (0â€“100) with detailed breakdown and fixes |
 | `/jobforge:job-search` | Find matching jobs, scored for fit, with network connection flags |
 | `/jobforge:tailor-resume` | Rewrite your resume for a specific job posting |
 | `/jobforge:cover-letter` | Write a tailored, human-sounding cover letter |
@@ -75,10 +75,10 @@ All your data is stored locally in `.jobforge/` (current directory) or `~/.jobfo
 
 ## Core Principles
 
-1. **Never fabricate** — Only uses what's real in your resume and profile
-2. **Human approval required** — Will never submit an application without your explicit confirmation
-3. **Quality over quantity** — Fewer, better applications beat mass-applying
-4. **Local-first** — All data stays on your machine
+1. **Never fabricate** â€” Only uses what's real in your resume and profile
+2. **Human approval required** â€” Will never submit an application without your explicit confirmation
+3. **Quality over quantity** â€” Fewer, better applications beat mass-applying
+4. **Local-first** â€” All data stays on your machine
 
 ---
 
@@ -90,6 +90,5 @@ All your data is stored locally in `.jobforge/` (current directory) or `~/.jobfo
 
 ---
 
-## License
 
-MIT
+

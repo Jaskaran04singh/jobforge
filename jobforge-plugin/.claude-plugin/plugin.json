@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "jobforge",
   "description": "AI-powered resume analysis, job search, ATS optimization, tailored cover letters, and auto-apply with approval",
   "version": "1.0.0",
@@ -6,6 +6,6 @@
     "name": "JobForge",
     "url": "https://github.com/yourusername/jobforge-plugin"
   },
-  "license": "MIT",
   "keywords": ["job-search", "resume", "ats", "cover-letter", "apply", "career"]
 }
+

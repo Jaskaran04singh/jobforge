@@ -66,5 +66,5 @@ See [DOCUMENTATION.md](./DOCUMENTATION.md) for detailed inputs, workflows, and r
 
 ---
 
-## 📄 License
-MIT License. Free and open-source.
+
+
