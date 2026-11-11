@@ -1,90 +1,93 @@
----
+﻿---
 name: jobforge-job-search
 description: >-
-  Search 100 to 1000+ jobs across multiple major job portals simultaneously:
-  LinkedIn, Indeed, Naukri, Unstop, Apna, Shine, Foundit, and direct ATS boards
-  (Greenhouse, Lever, Workday). Use when user asks to "find 100 jobs", "search
-  everywhere", "find jobs on LinkedIn and Naukri", "search Unstop and Apna",
-  "mass job search", "find high volume jobs", or "scan all portals for [role]".
-  Scores every job against candidate preferences, deduplicates cross-platform
-  listings, and saves verified openings into the application pipeline.
-argument-hint: "keywords and optional count (e.g. 'frontend developer remote 100' or 'naukri linkedin python')"
+  Search 100+ jobs across multiple job platforms: LinkedIn, Indeed, Naukri,
+  Apna, Shine, and HiringCafe. Use when the user asks to "find jobs", "search
+  100 jobs", "search linkedin jobs", "search naukri jobs", "search indeed jobs",
+  "search apna jobs", "search shine jobs", "multi-platform job search", "find me
+  jobs in India / remote", or "bulk job search". Pulls 100+ openings, deduplicates,
+  scores fit against resume, flags LinkedIn connections, and saves top postings.
+argument-hint: "role, location, and optional target count (e.g. 'Software Engineer India 100+')"
 ---
 
-# JobForge High-Volume Multi-Platform Job Search
+# JobForge Multi-Platform Job Search Skill (100+ Target)
 
-> **Priority hierarchy**: See `.agents/shared/references/priority-hierarchy.md`.
+> **Priority hierarchy**: See .agents/shared/references/priority-hierarchy.md.
+> **Platform Connectors**: See .agents/shared/references/job-platforms.md.
 
-Search and harvest 100 to 1000+ targeted job postings across all major domestic and global platforms:
-- **LinkedIn**
-- **Indeed**
-- **Naukri.com**
-- **Unstop** (College / Freshers / Tech)
-- **Apna.co** (Rapid hiring & local/remote tech)
-- **Shine.com**
-- **Foundit (Monster)**
-- **Hiring.cafe / Direct ATS** (Greenhouse, Lever, Workday)
+Search across 6 major platforms (**LinkedIn, Indeed, Naukri, Apna, Shine, HiringCafe**) and harvest 100+ job openings in a single run.
 
-## Quick Start
-- *"Search 100 jobs for Full Stack Developer across LinkedIn, Naukri, and Unstop"*
-- *"Find all remote Python jobs on Indeed, Apna, and Shine"*
-- *"Scan all platforms for 200 software engineering roles"*
+## Supported Portals & Query Rules
+
+1. **LinkedIn Jobs**: https://www.linkedin.com/jobs/search/?keywords={QUERY}&location={LOCATION}
+2. **Naukri**: https://www.naukri.com/{QUERY-SLUG}-jobs-in-{LOCATION-SLUG}?k={QUERY}&l={LOCATION}
+3. **Indeed (India/Global)**: https://in.indeed.com/jobs?q={QUERY}&l={LOCATION}
+4. **Apna**: https://apna.co/jobs?text={QUERY}&location={LOCATION}
+5. **Shine**: https://www.shine.com/job-search/{QUERY-SLUG}-jobs?q={QUERY}&loc={LOCATION}
+6. **HiringCafe**: https://hiring.cafe/?search={QUERY}
 
 ---
 
-## High-Volume Search Workflow
+## Workflow: 100+ Job Aggregation Loop
 
-### Step 1: Query Formulation & Multi-Platform Dispatch
-1. Parse user keywords, target locations, and desired volume (default: 50–100, max: 1000).
-2. Execute `scripts/engines/multi_platform_search.py` to generate targeted search feeds for:
-   - LinkedIn, Naukri, Indeed, Unstop, Apna, Shine, Foundit.
-3. Open or scrape search streams in parallel:
-   - **For ATS / Hiring.cafe:** Query direct employer postings.
-   - **For Naukri / Indeed / Shine:** Extract job cards with title, company, experience bracket, salary, and direct URL.
-   - **For Unstop / Apna:** Extract quick-apply opportunities and direct recruiter postings.
+### Step 1: Ingest Preferences & Search Query
+- Target query keywords (e.g. "React Developer", "Data Analyst", "Backend Engineer")
+- Location target (e.g. "India", "Bangalore", "Remote", "Delhi NCR")
+- Minimum target count: default **100 jobs** (unless specified otherwise)
 
-### Step 2: Extraction & Deduplication
-1. Collect raw listings using browser JavaScript selectors:
-   ```javascript
-   Array.from(document.querySelectorAll('[class*="job"],[class*="card"],[data-job-id]'))
-     .map(el => ({
-        title: el.querySelector('h2,h3,[class*="title"]')?.innerText,
-        company: el.querySelector('[class*="company"]')?.innerText,
-        location: el.querySelector('[class*="location"]')?.innerText,
-        url: el.querySelector('a')?.href
-     }))
-   ```
-2. Feed all raw results through `deduplicate_jobs()` to eliminate identical positions posted across multiple portals.
+### Step 2: Multi-Platform Batched Scraping
+Distribute queries across platforms using browser tools:
+* **LinkedIn**: Scrape 25-50 jobs (pages 1 & 2)
+* **Naukri**: Scrape 30-40 jobs (pages 1 & 2)
+* **Indeed**: Scrape 20-30 jobs (pages 1 & 2)
+* **Apna & Shine**: Scrape 20-30 jobs
+* **HiringCafe**: Scrape 20-30 direct corporate postings
 
-### Step 3: Fast-Batch Fit Scoring
-Score all harvested jobs (100–1000) into buckets:
-- **🟢 High Fit (80–100% Match):** Match role, salary, skills, and pass dealbreakers.
-- **🟡 Medium Fit (60–79% Match):** Good alignment, learnable skill gaps.
-- **⛔ Skip:** Mismatched location, blacklist companies, or hard dealbreakers.
+**Critical JS extraction pattern (No get_page_text blowout):**
+Execute in console via javascript_tool:
+`javascript
+(() => {
+  const selectors = [
+    // LinkedIn
+    '.job-search-card', '.base-card',
+    // Naukri
+    'article.jobTuple', 'div.srp-jobtuple-wrapper',
+    // Indeed
+    'div.job_seen_beacon', 'div.cardOutline',
+    // Shine & Apna
+    'div.jobCard', 'div[class*="JobCard"]',
+    // Fallback generic
+    '[class*="listing"], [class*="job-card"], [role="listitem"]'
+  ];
+  const items = Array.from(document.querySelectorAll(selectors.join(', ')));
+  return items.slice(0, 50).map(el => {
+    const a = el.querySelector('a[href*="/job"], a[href*="/viewjob"], a.title, a.base-card__full-link') || el.querySelector('a');
+    return {
+      title: (el.querySelector('h2, h3, a.title, [class*="title"]')?.innerText || '').trim(),
+      company: (el.querySelector('[class*="company"], [class*="brand"], [class*="comp-name"]')?.innerText || '').trim(),
+      location: (el.querySelector('[class*="location"], [class*="locWdth"]')?.innerText || '').trim(),
+      link: a ? a.href : window.location.href
+    };
+  }).filter(j => j.title && j.title.length > 2);
+})();
+`
 
-### Step 4: Batch Pipeline Export
-1. Save the aggregated master manifest to:
-   `~/.jobforge/search-batches/[YYYYMMDD]-[keywords]-manifest.json`
-2. Append all unique jobs into `~/.jobforge/job-history.md`.
-3. Auto-create job folders in `~/.jobforge/jobs/` for the top **High-Fit** positions so they are immediately queued for batch-applying.
+### Step 3: Deduplication & Clean
+1. Key items by lowercase(title) + '@' + lowercase(company).
+2. Filter out duplicates across sites.
+3. Keep searching subsequent platforms until aggregate total reaches **100+ unique jobs**.
 
----
+### Step 4: Fit Scoring & Ranking
+Evaluate all 100+ items against user's preferences.md and esume/:
+- **High Fit**: Meets role, core skills, no dealbreakers.
+- **Medium Fit**: Adjacent role, good tech overlap.
+- **Skip/Low**: Non-matching or violates dealbreaker.
 
-## Response Format
-Present results grouped by platform with a high-level summary table:
-```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 MULTI-PLATFORM HARVEST RESULTS ([Total Found] Jobs)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-LinkedIn : [Count] | Naukri : [Count] | Unstop : [Count]
-Indeed   : [Count] | Apna   : [Count] | Shine  : [Count]
-Direct   : [Count]
-
-🟢 TOP HIGH-FIT MATCHES (Ready to Apply)
-1. [Role] at [Company] — [Platform] — [Salary] — [Apply URL]
-2. [Role] at [Company] — [Platform] — [Salary] — [Apply URL]
-...
-
-Next Action:
-Say "Batch apply to top 20 high-fit jobs" or "Apply to all LinkedIn Easy Apply jobs"
-```
+### Step 5: Save & Present Results
+1. Append all 100+ jobs into DATA_DIR/job-history.md with source portal tagged.
+2. For the **Top 5 High Fit** jobs, resolve direct application URLs and save job folders.
+3. Cross-reference with DATA_DIR/linkedin-contacts.csv for 1st-degree referral paths.
+4. Output a clean breakdown:
+   - Total Scanned: 100+ (by portal: LinkedIn, Naukri, Indeed, Apna, Shine)
+   - Top Ranked Matches with direct apply links
+   - Next steps to tailor resume or auto-apply.
