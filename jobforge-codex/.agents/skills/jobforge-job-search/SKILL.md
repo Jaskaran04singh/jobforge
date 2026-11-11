@@ -1,217 +1,90 @@
 ---
 name: jobforge-job-search
 description: >-
-  Search for jobs that match the user's resume and preferences. Use when the
-  user asks to "find jobs", "search for jobs", "what jobs fit me", "job
-  matches", "find me a job", "look for openings", "daily job search", or
-  "search [keyword] jobs". Scores every result for fit using the user's
-  preferences and dealbreakers. Flags when the user has LinkedIn connections
-  at a company. Saves high-fit job postings to data folders for tailoring
-  and applying. Accepts optional search keywords as argument.
-argument-hint: "optional search keyword (e.g. 'senior engineer remote', 'product manager fintech')"
+  Search 100 to 1000+ jobs across multiple major job portals simultaneously:
+  LinkedIn, Indeed, Naukri, Unstop, Apna, Shine, Foundit, and direct ATS boards
+  (Greenhouse, Lever, Workday). Use when user asks to "find 100 jobs", "search
+  everywhere", "find jobs on LinkedIn and Naukri", "search Unstop and Apna",
+  "mass job search", "find high volume jobs", or "scan all portals for [role]".
+  Scores every job against candidate preferences, deduplicates cross-platform
+  listings, and saves verified openings into the application pipeline.
+argument-hint: "keywords and optional count (e.g. 'frontend developer remote 100' or 'naukri linkedin python')"
 ---
 
-# JobForge Job Search Skill
+# JobForge High-Volume Multi-Platform Job Search
 
 > **Priority hierarchy**: See `.agents/shared/references/priority-hierarchy.md`.
 
-Find jobs that match the user's profile. Score every result. Flag network connections. Save top postings.
+Search and harvest 100 to 1000+ targeted job postings across all major domestic and global platforms:
+- **LinkedIn**
+- **Indeed**
+- **Naukri.com**
+- **Unstop** (College / Freshers / Tech)
+- **Apna.co** (Rapid hiring & local/remote tech)
+- **Shine.com**
+- **Foundit (Monster)**
+- **Hiring.cafe / Direct ATS** (Greenhouse, Lever, Workday)
 
 ## Quick Start
-
-- Ask: **"Find matching jobs"** — searches using default terms from preferences
-- Ask: **"Search for senior engineer jobs"** — searches with specific keywords
-
-## File Structure
-
-```
-scripts/
-  evaluate-jobs.md         # Job evaluation subagent prompt
-assets/
-  templates/
-    job-history-init.md    # Template for new job-history.md
-```
-
-## Data Directory
-
-Resolve using `.agents/shared/references/data-directory.md`. Resume and preferences are both required.
+- *"Search 100 jobs for Full Stack Developer across LinkedIn, Naukri, and Unstop"*
+- *"Find all remote Python jobs on Indeed, Apna, and Shine"*
+- *"Scan all platforms for 200 software engineering roles"*
 
 ---
 
-## Workflow
+## High-Volume Search Workflow
 
-### Step 0: Check Prerequisites
+### Step 1: Query Formulation & Multi-Platform Dispatch
+1. Parse user keywords, target locations, and desired volume (default: 50–100, max: 1000).
+2. Execute `scripts/engines/multi_platform_search.py` to generate targeted search feeds for:
+   - LinkedIn, Naukri, Indeed, Unstop, Apna, Shine, Foundit.
+3. Open or scrape search streams in parallel:
+   - **For ATS / Hiring.cafe:** Query direct employer postings.
+   - **For Naukri / Indeed / Shine:** Extract job cards with title, company, experience bracket, salary, and direct URL.
+   - **For Unstop / Apna:** Extract quick-apply opportunities and direct recruiter postings.
 
-Resolve the data directory. `DATA_DIR/resume/` and `DATA_DIR/preferences.md` are both required.
-
----
-
-### Step 1: Load Context
-
-Read:
-- `DATA_DIR/resume/*` — skills, experience, primary role
-- `DATA_DIR/preferences.md` — target roles, location, salary, dealbreakers
-- `DATA_DIR/job-history.md` — to avoid duplicate results (load if it exists)
-- `DATA_DIR/linkedin-contacts.csv` — for network matching (load if it exists)
-
-Extract search terms from:
-1. User's argument/request (keywords they specified)
-2. Target roles from `preferences.md`
-
----
-
-### Step 2: Search for Jobs
-
-Use browser tools to search job boards. Start with:
-- **hiring.cafe** — broad aggregator, good signal-to-noise
-- **wellfound.com** — for startup roles
-- **LinkedIn Jobs** — search only (do not use Easy Apply from here)
-
-For each search term, enter the query and apply filters: date posted (last 7 days), location, remote/onsite preference.
-
-**Extracting results — IMPORTANT:**
-Do NOT use `get_page_text` on listing pages — it overloads the context window.
-
-Use `javascript_tool` to extract only structured listing rows:
-
-```javascript
-Array.from(document.querySelectorAll('[class*="job"],[class*="listing"],[class*="card"],[role="listitem"]'))
-  .slice(0, 50)
-  .map(el => el.innerText.trim())
-  .filter(t => t.length > 20 && t.length < 500)
-  .join('\n---\n')
-```
-
-If that selector doesn't match, take a screenshot to understand the structure, then write a targeted JS selector. Goal: title + company + location + salary only — not the full page.
-
-**Never show aggregator URLs to the user.** Resolve direct employer URLs in Step 5.
-
----
-
-### Step 3: Score Each Job
-
-For each result, apply the fit scoring criteria in `.agents/shared/references/fit-scoring.md`.
-
-Also check keyword overlap between job requirements and resume skills using `.agents/shared/references/ats-rules.md`.
-
----
-
-### Step 4: Save to Job History
-
-Append ALL jobs seen (not just good fits) to `DATA_DIR/job-history.md` to avoid duplicates in future searches:
-
-```markdown
-## [DATE] — Search: "[terms]"
-
-| Job Title | Company | Location | Salary | Fit | Notes |
-|-----------|---------|----------|--------|-----|-------|
-| ... | ... | ... | ... | High/Med/Low/Skip | ... |
-```
-
-Create the file if it doesn't exist.
-
----
-
-### Step 5: Resolve Employer URLs & Save Top Job Folders
-
-For each **High-fit** job:
-1. Click through to the actual employer careers page
-2. Capture the direct employer job posting URL
-3. Extract job description using `javascript_tool`:
+### Step 2: Extraction & Deduplication
+1. Collect raw listings using browser JavaScript selectors:
    ```javascript
-   document.querySelector('[class*="description"],[class*="content"],article,main')?.innerText
+   Array.from(document.querySelectorAll('[class*="job"],[class*="card"],[data-job-id]'))
+     .map(el => ({
+        title: el.querySelector('h2,h3,[class*="title"]')?.innerText,
+        company: el.querySelector('[class*="company"]')?.innerText,
+        location: el.querySelector('[class*="location"]')?.innerText,
+        url: el.querySelector('a')?.href
+     }))
    ```
-4. Save to `DATA_DIR/jobs/[company-slug]-[YYYYMMDD]/posting.md` with the direct URL at the top
+2. Feed all raw results through `deduplicate_jobs()` to eliminate identical positions posted across multiple portals.
 
-For **Medium-fit** jobs: resolve direct URL only (don't save full posting).
+### Step 3: Fast-Batch Fit Scoring
+Score all harvested jobs (100–1000) into buckets:
+- **🟢 High Fit (80–100% Match):** Match role, salary, skills, and pass dealbreakers.
+- **🟡 Medium Fit (60–79% Match):** Good alignment, learnable skill gaps.
+- **⛔ Skip:** Mismatched location, blacklist companies, or hard dealbreakers.
 
-If the direct link can't be resolved, note the company name so the user can find it themselves.
-
----
-
-### Step 6: Check Network Connections
-
-If `DATA_DIR/linkedin-contacts.csv` was loaded, cross-reference each company name against the CSV "Company" column using fuzzy matching ("Google" matches "Google LLC", "Alphabet/Google").
-
-If there's a match, note the contact's name and title for the results output.
-
----
-
-### Step 7: Present Results
-
-Show only new High and Medium fit jobs not already in the user's job history.
-
-```markdown
-## Job Search Results — [DATE]
-Search: "[terms used]"
-
----
-
-### 🟢 HIGH FIT
-
-#### 1. [Job Title] at [Company]
-- **Why it fits**: [2–3 specific reasons based on resume + preferences]
-- **Salary**: $Xk–$Yk (or "Not listed")
-- **Location**: [Remote / City, State]
-- **Network**: You know [Name] ([Title]) at [Company]
-- **Apply**: [direct employer URL]
-
----
-
-### 🟡 MEDIUM FIT
-
-#### 1. [Job Title] at [Company]
-- **Why it's medium**: [what matches, what's missing]
-- **Salary**: $Xk
-- **Location**: [location]
-- **Apply**: [direct employer URL]
-```
-
-Omit Network line if no connection. Omit Medium section if empty.
-
----
-
-### Step 8: Offer Next Steps
-
-```
-Next steps:
-  → "Tailor my resume for [company URL]" — optimize resume for a specific job
-  → "Write a cover letter for [company URL]" — write a tailored letter
-  → "Apply to [company URL]" — fill and submit the application
-  → "Search for [different keywords]" — try a different search
-```
-
-**Do NOT tailor resumes, write cover letters, or fill applications in this skill.** Those are separate skills. Direct the user to ask for them explicitly.
-
----
-
-### Step 9: Learn from Feedback
-
-If the user gives feedback on results, update `DATA_DIR/preferences.md` immediately:
-- "No agencies" → add to Dealbreakers
-- "Only AI companies" → add to Nice-to-Haves
-- "Minimum $200k total comp" → update Compensation section
+### Step 4: Batch Pipeline Export
+1. Save the aggregated master manifest to:
+   `~/.jobforge/search-batches/[YYYYMMDD]-[keywords]-manifest.json`
+2. Append all unique jobs into `~/.jobforge/job-history.md`.
+3. Auto-create job folders in `~/.jobforge/jobs/` for the top **High-Fit** positions so they are immediately queued for batch-applying.
 
 ---
 
 ## Response Format
+Present results grouped by platform with a high-level summary table:
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 MULTI-PLATFORM HARVEST RESULTS ([Total Found] Jobs)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+LinkedIn : [Count] | Naukri : [Count] | Unstop : [Count]
+Indeed   : [Count] | Apna   : [Count] | Shine  : [Count]
+Direct   : [Count]
 
-1. **Top Matches** — High and Medium fits with company, role, salary, location, network, URL
-2. **Next Steps** — what to run next
+🟢 TOP HIGH-FIT MATCHES (Ready to Apply)
+1. [Role] at [Company] — [Platform] — [Salary] — [Apply URL]
+2. [Role] at [Company] — [Platform] — [Salary] — [Apply URL]
+...
 
----
-
-## Permissions Required
-
-```json
-{
-  "permissions": {
-    "allow": [
-      "Read(~/.jobforge/**)",
-      "Write(~/.jobforge/**)",
-      "Edit(~/.jobforge/**)",
-      "mcp__browser__*"
-    ]
-  }
-}
+Next Action:
+Say "Batch apply to top 20 high-fit jobs" or "Apply to all LinkedIn Easy Apply jobs"
 ```
