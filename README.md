@@ -62,9 +62,10 @@ In your project directory, run:
 `
 
 ### 3. Read the Full Documentation
-See [DOCUMENTATION.md](./DOCUMENTATION.md) for detailed inputs, workflows, and response formats.
+See [DOCUMENTATION.md](./DOCUMENTATION.md) and [CODEX_SETUP_GUIDE.md](./CODEX_SETUP_GUIDE.md) for detailed inputs, workflows, and response formats.
 
 ---
+
 
 
 

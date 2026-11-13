@@ -92,3 +92,7 @@ All your data is stored locally in `.jobforge/` (current directory) or `~/.jobfo
 
 
 
+
+
+For Codex Desktop specific setup, see [CODEX_SETUP_GUIDE.md](../CODEX_SETUP_GUIDE.md).
+
